@@ -1,0 +1,29 @@
+{
+  "supported_extensions": [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".heic",
+    ".webp",
+    ".gif",
+    ".bmp"
+  ],
+  "scan_options": {
+    "include_hidden_folders": false,
+    "include_system_folders": false,
+    "min_file_size_bytes": 1024
+  },
+  "suggestion_strategy": "keep_highest_resolution",
+  "ui_preferences": {
+    "thumbnail_size": 150,
+    "theme": "light"
+  },
+  "performance": {
+    "max_worker_threads": 4,
+    "hash_chunk_size_kb": 64
+  },
+  "perceptual_hash": {
+    "enabled": false,
+    "similarity_threshold": 5
+  }
+}

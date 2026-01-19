@@ -128,7 +128,29 @@ class MainWindow(QMainWindow):
             }
         """)
         self.scan_button.clicked.connect(self.start_scan)
-        layout.addWidget(self.scan_button)
+        
+        # Load previous results button
+        self.load_results_button = QPushButton("📁 Load Previous Results")
+        self.load_results_button.setMinimumHeight(40)
+        self.load_results_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #0b7dda;
+            }
+        """)
+        self.load_results_button.clicked.connect(self.load_previous_results)
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.scan_button)
+        button_layout.addWidget(self.load_results_button)
+        layout.addLayout(button_layout)
         
         # Stretch to push everything to top
         layout.addStretch()
@@ -376,3 +398,93 @@ class MainWindow(QMainWindow):
         """Open the results view window."""
         results_window = ResultsView(duplicate_groups, self)
         results_window.show()
+    
+    def load_previous_results(self):
+        """Load previously saved scan results from JSON file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Previous Results",
+            "",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            # Load JSON file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Check if it's a valid duplicate results file
+            if 'groups' not in data:
+                QMessageBox.warning(
+                    self,
+                    "Invalid File",
+                    "This file doesn't appear to be a valid duplicate scan result."
+                )
+                return
+            
+            # Reconstruct DuplicateGroup objects from JSON
+            duplicate_groups = []
+            for group_data in data['groups']:
+                # Reconstruct FileInfo objects
+                files = []
+                for file_data in group_data['files']:
+                    file_info = FileInfo(
+                        path=file_data['path'],
+                        size=file_data['size'],
+                        extension=file_data['extension'],
+                        resolution=tuple(file_data['resolution']) if file_data['resolution'] else None,
+                        created_time=file_data['created_time'],
+                        modified_time=file_data['modified_time']
+                    )
+                    files.append(file_info)
+                
+                # Create DuplicateGroup
+                group = DuplicateGroup(
+                    files=files,
+                    detection_method=group_data['detection_method'],
+                    similarity_score=group_data.get('similarity_score', 100.0)
+                )
+                duplicate_groups.append(group)
+            
+            if not duplicate_groups:
+                QMessageBox.information(
+                    self,
+                    "No Results",
+                    "The loaded file contains no duplicate groups."
+                )
+                return
+            
+            # Show success message
+            total_files = sum(len(group.files) for group in duplicate_groups)
+            total_wasted = sum(group.get_total_wasted_space() for group in duplicate_groups)
+            from utils import format_bytes
+            
+            QMessageBox.information(
+                self,
+                "Results Loaded",
+                f"Successfully loaded {len(duplicate_groups)} duplicate groups\n"
+                f"({total_files} files, {format_bytes(total_wasted)} wasted space)\n\n"
+                f"From: {os.path.basename(file_path)}"
+            )
+            
+            # Open results view
+            self.open_results_view(duplicate_groups)
+        
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            QMessageBox.critical(
+                self,
+                "Invalid JSON",
+                f"Failed to parse JSON file:\n{str(e)}"
+            )
+        
+        except Exception as e:
+            logger.error(f"Error loading results: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Load Error",
+                f"An error occurred while loading results:\n{str(e)}"
+            )

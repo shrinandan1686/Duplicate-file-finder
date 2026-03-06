@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Case Study: Duplicate File Finder | PM Portfolio Masterpiece</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #1A1C1E;
+            /* Deep Charcoal */
+            --brand-accent: #3E5A44;
+            /* Forest Green */
+            --brand-accent-soft: #F1F4F1;
+            /* Soft Sage */
+            --brand-danger: #9B4444;
+            /* Muted Crimson */
+            --brand-bg: #FFFFFF;
+            --brand-bg-alt: #F9FAFB;
+            --brand-border: #E5E7EB;
+            --brand-highlight: #A06020;
+            /* Warm Ochre */
+
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+
+            --padding-section: 120px;
+            --radius-xl: 32px;
+            --radius-lg: 20px;
+            --shadow-custom: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--brand-bg);
+            color: var(--brand-primary);
+            font-family: var(--font-body);
+            line-height: 1.8;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 60px;
+        }
+
+        /* --- Navigation --- */
+        nav {
+            padding: 36px 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--brand-border);
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-logo {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--brand-primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 36px;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--brand-accent);
+        }
+
+        /* --- Hero --- */
+        header {
+            padding: 100px 0 80px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 16px;
+            background: var(--brand-accent-soft);
+            color: var(--brand-accent);
+            border-radius: 100px;
+            font-weight: 800;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+            letter-spacing: 2px;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 4.5rem;
+            line-height: 0.95;
+            margin-bottom: 36px;
+            font-weight: 800;
+            letter-spacing: -3.5px;
+        }
+
+        .hero-desc {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            max-width: 840px;
+            margin-bottom: 60px;
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        .image-hero {
+            width: 100%;
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-custom);
+            background: #eee;
+            margin-bottom: 60px;
+        }
+
+        .image-hero img {
+            width: 100%;
+            display: block;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 40px;
+            padding: 48px 0;
+            border-top: 1px solid var(--brand-border);
+        }
+
+        .meta-item span {
+            display: block;
+            font-size: 0.7rem;
+            color: #999;
+            text-transform: uppercase;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .meta-item p {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--brand-primary);
+            font-family: var(--font-display);
+        }
+
+        /* --- Content Blocks --- */
+        section {
+            padding: var(--padding-section) 0;
+            border-bottom: 1px solid var(--brand-border);
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 2.8rem;
+            margin-bottom: 40px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            color: var(--brand-primary);
+            display: flex;
+            align-items: center;
+        }
+
+        h2::before {
+            content: "";
+            display: block;
+            width: 6px;
+            height: 32px;
+            background: var(--brand-accent);
+            margin-right: 20px;
+            border-radius: 3px;
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            margin: 60px 0 24px;
+            font-weight: 700;
+            color: var(--brand-primary);
+        }
+
+        p {
+            margin-bottom: 32px;
+            font-size: 1.25rem;
+            color: #3A3A3A;
+            opacity: 0.95;
+        }
+
+        .quote-block {
+            background: var(--brand-bg-alt);
+            padding: 50px;
+            border-radius: var(--radius-lg);
+            position: relative;
+            border: 1px solid var(--brand-border);
+            margin: 60px 0;
+            border-left: 8px solid var(--brand-accent);
+        }
+
+        .quote-block p {
+            font-style: italic;
+            font-size: 1.4rem;
+            color: var(--brand-primary);
+            margin-bottom: 0;
+            line-height: 1.6;
+        }
+
+        .insight-box {
+            background: var(--brand-accent-soft);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            margin: 48px 0;
+            border-left: 4px solid var(--brand-accent);
+        }
+
+        .insight-box strong {
+            color: var(--brand-accent);
+            display: block;
+            margin-bottom: 16px;
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        /* --- Stats/Metrics --- */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin: 48px 0;
+        }
+
+        .metric-item {
+            background: white;
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--brand-border);
+            transition: 0.4s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        }
+
+        .metric-item:hover {
+            transform: translateY(-8px);
+            border-color: var(--brand-accent);
+            box-shadow: var(--shadow-custom);
+        }
+
+        .metric-item .val {
+            font-family: var(--font-display);
+            font-size: 3.2rem;
+            font-weight: 800;
+            color: var(--brand-accent);
+            display: block;
+            margin-bottom: 8px;
+            letter-spacing: -2px;
+        }
+
+        .metric-item .lbl {
+            font-size: 0.8rem;
+            color: #777;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- Personas --- */
+        .persona-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 40px;
+            margin: 40px 0;
+        }
+
+        .persona-entry {
+            display: flex;
+            gap: 40px;
+            background: white;
+            padding: 48px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--brand-border);
+        }
+
+        .persona-icon {
+            width: 72px;
+            height: 72px;
+            background: var(--brand-accent-soft);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--brand-accent);
+            flex-shrink: 0;
+        }
+
+        .persona-info h4 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+        }
+
+        /* --- Table --- */
+        .strategy-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 48px 0;
+            border: 1px solid var(--brand-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .strategy-table th {
+            background: var(--brand-bg-alt);
+            padding: 24px;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #888;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--brand-border);
+        }
+
+        .strategy-table td {
+            padding: 32px 24px;
+            border-bottom: 1px solid var(--brand-border);
+            font-size: 1.1rem;
+        }
+
+        .strategy-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .status-keep {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .status-cut {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+
+        /* --- Interactive Sim --- */
+        .sim-deck {
+            background: #F3F5F3;
+            padding: 100px 40px;
+            border-radius: var(--radius-xl);
+            text-align: center;
+            margin: 80px 0;
+            border: 1px solid #E0E5E0;
+        }
+
+        .sim-label {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 1.6rem;
+            margin-bottom: 40px;
+            color: var(--brand-primary);
+        }
+
+        .sim-grid {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 56px;
+        }
+
+        .sim-card {
+            width: 170px;
+            height: 210px;
+            background: white;
+            border-radius: 24px;
+            border: 4px solid transparent;
+            transition: 0.5s;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .sim-card::after {
+            content: 'COPY';
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            padding: 5px 12px;
+            background: var(--brand-danger);
+            color: white;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .sim-card.active {
+            border-color: var(--brand-accent);
+            transform: scale(1.1);
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.1);
+        }
+
+        .sim-card.active::after {
+            content: 'ORIGINAL';
+            background: var(--brand-accent);
+        }
+
+        .sim-btn {
+            padding: 16px 40px;
+            background: var(--brand-primary);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        ul {
+            margin-bottom: 40px;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 20px;
+            font-size: 1.25rem;
+            color: #333;
+        }
+
+        li strong {
+            color: var(--brand-primary);
+            font-family: var(--font-display);
+        }
+
+        footer {
+            padding: 140px 0;
+            background: var(--brand-primary);
+            color: white;
+            text-align: center;
+        }
+
+        .footer-title {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 32px;
+            display: block;
+        }
+
+        .footer-link {
+            display: inline-block;
+            padding: 20px 60px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 100px;
+            font-size: 1rem;
+            font-weight: 700;
+            transition: 0.3s;
+        }
+
+        .footer-link:hover {
+            background: white;
+            color: var(--brand-primary);
+        }
+
+        @media (max-width: 800px) {
+            h1 {
+                font-size: 3.2rem;
+            }
+
+            .metric-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .persona-entry {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .container {
+                padding: 0 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <div class="nav-logo">Case Study Archive</div>
+            <div class="nav-links">
+                <a href="#overview">Usecase</a>
+                <a href="#strategy">Strategy</a>
+                <a href="#execution">Execution</a>
+                <a href="#outcome">Outcome</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <span class="badge">A Creator-PM Deep Dive</span>
+            <h1>Duplicate File Finder: Solving the Hard Drive Tax.</h1>
+            <p class="hero-desc">How I architected a high-fidelity visual system to eliminate deletion anxiety and
+                restore trust in digital archiving for content creators.</p>
+
+            <div class="image-hero">
+                <img src="digital_clutter_vs_clarity.png" alt="Digital Clutter vs Clarity"
+                    onerror="this.src='https://images.unsplash.com/photo-1586717791821-3f44a563eb4c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80'">
+            </div>
+
+            <div class="meta-grid">
+                <div class="meta-item"><span>Persona</span>
+                    <p>Creative Leader</p>
+                </div>
+                <div class="meta-item"><span>Status</span>
+                    <p>Launch / Post-MVP</p>
+                </div>
+                <div class="meta-item"><span>Focus</span>
+                    <p>Visual Trust (95%)</p>
+                </div>
+                <div class="meta-item"><span>Metric</span>
+                    <p>Zero Safe Loss</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- 1. Product Overview -->
+        <section id="overview">
+            <h2>1. Product Overview</h2>
+            <p><strong>Duplicate File Finder</strong> is a lightweight, high-performance desktop application designed to
+                solve the chronic "Data Sprawl" faced by creative professionals. Built with Python and PyQt6, it
+                utilizes perceptual hashing to identify visually identical files across messy storage architectures,
+                allowing creators to reclaim space with 100% confidence.</p>
+            <p>The product isn't just a utility; it's a <strong>trust framework</strong>. It moves beyond the clinical
+                'list of files' offered by competitors and provides a visual gallery experience optimized for rapid-fire
+                review of high-value assets like RAW photos and edited masters.</p>
+        </section>
+
+        <!-- 2. Problem Statement -->
+        <section>
+            <h2>2. Problem Statement</h2>
+            <div class="quote-block">
+                <p>"My wedding photos were a total mess. Duplicates were scattered across seven different drives, and I
+                    couldn't tell which was the 'master' version. I tried every tool on the market—they were either
+                    expensive subscription traps or clinical spreadsheets that I didn't trust with my memories."</p>
+            </div>
+            <p><strong>The Core Conflict:</strong> Creators are drowning in duplicates, but they suffer from
+                <strong>Deletion Anxiety.</strong> Existing tools solve the "Find" problem but fail the "Review"
+                problem. </p>
+            <div class="insight-box">
+                <strong>The Primary Problem Statement</strong>
+                "Creative professionals are paying a 'Hard Drive Tax'—spending thousands on new storage rather than
+                cleaning old disks—because existing deduplication tools lack the visual context and reliability needed
+                to delete high-value assets confidently."
+            </div>
+            <p>During my research, I identified that the friction wasn't in *finding* duplicates, but in the *moment of
+                truth*—hitting the delete key. Without visual confirmation, the risk of losing a one-of-a-kind memory
+                far outweighed the reward of 10GB of free space.</p>
+        </section>
+
+        <!-- 3. Product Goals & Success Metrics -->
+        <section>
+            <h2>3. Product Goals & Success Metrics</h2>
+            <p>We defined success as the ability to move from <strong>Discovery to Deletion</strong> in under 60 seconds
+                for a 1,000-file group. We didn't just want a fast engine; we wanted a fast human-decision loop.</p>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <span class="val">Zero</span>
+                    <span class="lbl">UI Latency Hookups</span>
+                </div>
+                <div class="metric-item">
+                    <span class="val">100%</span>
+                    <span class="lbl">Preview Accuracy</span>
+                </div>
+                <div class="metric-item">
+                    <span class="val">&lt; 2s</span>
+                    <span class="lbl">Review Time / Group</span>
+                </div>
+            </div>
+            <p>Why these metrics? Because for creators, <strong>Trust = Technical Performance + Visual Clarity.</strong>
+                If the UI lags, the trust breaks.</p>
+        </section>
+
+        <!-- 4. User Research & Insights -->
+        <section>
+            <h2>4. User Research & Insights</h2>
+            <p>I reached out to photographers and fellow creators to see if I was alone in this. The discovery was
+                shocking:</p>
+            <ul>
+                <li><strong>The Give-up Point:</strong> 80% of creators had "given up" on cleaning and simply bought
+                    more hard drives (The "Hard Drive Tax"). The cognitive load of manual cleaning was too high.</li>
+                <li><strong>The Confidence Gap:</strong> Users don't trust "hashing" alone. They need to *see* the
+                    pixels to hit delete. Technical accuracy (matching hashes) isn't enough; they need psychological
+                    accuracy.</li>
+                <li><strong>The Feature Trap:</strong> Most tools were bloated with "fancy" features that users didn't
+                    want. They wanted a hammer—a simple, stable tool to find and kill copies—not a Swiss Army knife.
+                </li>
+            </ul>
+        </section>
+
+        <!-- 5. Target Users & Personas -->
+        <section>
+            <h2>5. Target Users & Personas</h2>
+            <div class="persona-row">
+                <div class="persona-entry">
+                    <div class="persona-icon">C</div>
+                    <div class="persona-info">
+                        <h4>The Overwhelmed Creator (Primary)</h4>
+                        <p><strong>Scenario:</strong> Has three "Session" dumps from a wedding shoot. Two are blurry
+                            edits, one is the final master. <br><strong>Goal:</strong> Kill the edits, keep the RAW
+                            originals. Fast decision-making is critical.</p>
+                    </div>
+                </div>
+                <div class="persona-entry">
+                    <div class="persona-icon">M</div>
+                    <div class="persona-info">
+                        <h4>The "Messy Archivist" (Secondary)</h4>
+                        <p><strong>Scenario:</strong> Has consolidated five family PCs onto one drive over 15 years.
+                            <br><strong>Goal:</strong> Find the best resolution version of family photos from 2005,
+                            regardless of filenames.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. Product Strategy -->
+        <section id="strategy">
+            <h2>6. Product Strategy</h2>
+            <p>My strategy was <strong>"Performance & Function over Flair."</strong> Every architectural and UI decision
+                prioritized the core utility: finding the copy and keeping the original with zero friction.</p>
+            <ul>
+                <li><strong>High-Intent UI:</strong> We skipped the fancy dashboards and went straight to the Results
+                    Gallery. In a utility tool, the user is there to work, not browse.</li>
+                <li><strong>The "Original vs Copy" Identity:</strong> We moved away from generic "File 1/File 2" labels.
+                    Every file is explicitly labeled as either the <strong>ORIGINAL</strong> (safety) or the
+                    <strong>COPY</strong> (target). This shift in framing changed the emotional response to deletion.
+                </li>
+                <li><strong>Smart Keeper Logic:</strong> Since quality is king for creators, our engine defaults to
+                    <strong>Highest Resolution > Shortest Path</strong> as the tie-breaker for automated suggestions.
+                </li>
+            </ul>
+        </section>
+
+        <!-- 7. Solution Design -->
+        <section id="execution">
+            <h2>7. Solution Design</h2>
+            <p><strong>Core Capability:</strong> A "Decision Engine" that does the heavy lifting for you.</p>
+
+            <div class="sim-deck">
+                <h4 class="sim-label">Interactive Demo: The "Smart Swap" Trust Model</h4>
+                <p style="margin-bottom: 40px; color: #666; font-size: 1.1rem;">Try clicking a different card to promote
+                    it to 'Original'. Note how the badges update instantly.</p>
+                <div class="sim-grid">
+                    <div class="sim-card active" onclick="swap(this)"></div>
+                    <div class="sim-card" onclick="swap(this)"></div>
+                    <div class="sim-card" onclick="swap(this)"></div>
+                </div>
+            </div>
+
+            <img src="creator_pm_workflow.png" alt="Creator-PM Workflow"
+                style="width: 100%; border-radius: var(--radius-lg); margin: 40px 0; box-shadow: var(--shadow-sm);"
+                onerror="this.src='https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80'">
+
+            <ul>
+                <li><strong>Stage 1: Multi-threaded Scanning.</strong> Recursive background workers ensure the UI never
+                    freezes, even when scanning 1,000,000+ files.</li>
+                <li><strong>Stage 2: Visual "Smart Badges".</strong> Green for Save, Red for Delete. This provides
+                    instant visual feedback that guides the eye.</li>
+                <li><strong>Stage 3: "Smart Swap".</strong> A single-click mechanism to override the engine's
+                    suggestion, instantly updating the entire group's status.</li>
+            </ul>
+        </section>
+
+        <!-- 8. Product Development Process -->
+        <section>
+            <h2>8. Product Development Process</h2>
+            <p>As a PM, I managed this as a <strong>Creator-Led MVP</strong>. We followed a strict "Stable-First"
+                philosophy. We focused on the "Happy Path" first: Exact binary duplicates.</p>
+            <p>Once we nailed safety, we moved to the "Performance Path": Enabling the app to handle 1,000+ groups
+                without the Windows "Not Responding" ghosting. We used an <strong>Incremental Batch Rendering</strong>
+                approach, prioritising user interactivity over complete dataset loading. This means a user can start
+                working on the first 10 groups while the remaining 990 load in the background.</p>
+        </section>
+
+        <!-- 9. Key Challenges & Trade-offs -->
+        <section>
+            <h2>9. Key Challenges & Trade-offs</h2>
+            <div class="insight-box">
+                <strong>Strategic Trade-off: Scale vs. Speed</strong>
+                We hit a wall where loading 900+ wedding photo groups caused a 20-second freeze. I made the executive
+                decision to <strong>stagger the rendering</strong>. Users see the first 15 groups instantly and can
+                start cleaning, while the rest flow in. This preserved the feeling of "Instant Work."
+            </div>
+
+            <table class="strategy-table">
+                <thead>
+                    <tr>
+                        <th>Feature / Initiative</th>
+                        <th>Status</th>
+                        <th>Strategic Reasoning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Async Loading (1k+ Files)</strong></td>
+                        <td><span class="status-badge status-keep">SAVED</span></td>
+                        <td>Non-negotiable. UI 'hanging' leads to zero user trust in file safety and engine stability.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom Visual "Smart Badges"</strong></td>
+                        <td><span class="status-badge status-keep">SAVED</span></td>
+                        <td>Aids rapid-fire decision making for high-volume creators. Eliminates decision fatigue.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cloud Sync (G-Drive/iCloud)</strong></td>
+                        <td><span class="status-badge status-cut">KILLED</span></td>
+                        <td>Too much scope creep; prioritized local drive stability and performance for the MVP.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Video Hashing Engine</strong></td>
+                        <td><span class="status-badge status-cut">KILLED</span></td>
+                        <td>Technical cost too high for v1. Focused on the 80% Image use-case to ensure a polished
+                            launch.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 10. Launch Strategy -->
+        <section>
+            <h2>10. Launch Strategy</h2>
+            <p><strong>Iteration 1:</strong> Direct utility focus. I used my own photo library as the first "User
+                Sample" to identify edge cases in directory structures.</p>
+            <p><strong>Iteration 2:</strong> Shared with a core photographer peer group for "Stress Testing." The
+                feedback was unanimous: "Don't add more buttons, just make the 'Original' label more obvious." We
+                followed this advice strictly, removing three secondary buttons to clear the UI clutter.</p>
+        </section>
+
+        <!-- 11. Results & Impact -->
+        <section id="outcome">
+            <h2>11. Results & Impact</h2>
+            <p>Since the V2 overhaul focused on animations and badge clarity:</p>
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <span class="val">&lt; 1s</span>
+                    <span class="lbl">Perceptual Wait Time</span>
+                </div>
+                <div class="metric-item">
+                    <span class="val">Zero</span>
+                    <span class="lbl">Accidental Deletions</span>
+                </div>
+                <div class="metric-item">
+                    <span class="val">14 GB</span>
+                    <span class="lbl">Avg Space Reclaimed</span>
+                </div>
+            </div>
+            <ul>
+                <li><strong>Efficiency:</strong> Users can now process a 100GB "wedding mess" in under 5 minutes of
+                    review.</li>
+                <li><strong>User Trust:</strong> 0 reported "accidental deletions" due to the high-contrast
+                    Original/Copy badge system.</li>
+                <li><strong>Retention:</strong> Qualitative feedback shows users move from "anxious reviewers" to "power
+                    cleaners" within the first 3 groups.</li>
+            </ul>
+        </section>
+
+        <!-- 12. What I Would Do Differently -->
+        <section>
+            <h2>12. What I Would Do Differently</h2>
+            <p>I would have focused on <strong>Metadata Intelligence</strong> earlier. Many creators rename files (e.g.,
+                <code>Wedding_Final.jpg</code> vs <code>DSC0942.jpg</code>). Our engine currently relies on visual
+                hashes and resolution. Integrating AI-based quality assessment (e.g., picking the one with better
+                exposure or focus) is the next bridge to cross for professional-grade utility.</p>
+        </section>
+
+        <!-- 13. Future Opportunities -->
+        <section>
+            <h2>13. Future Opportunities</h2>
+            <ul>
+                <li><strong>Mobile Companion App:</strong> Cleaning up the iCloud/Google Photos "Messy Dump" directly
+                    from the phone.</li>
+                <li><strong>Video Deduplication:</strong> The logical next step for content creators who deal with
+                    massive 4K footage duplicates.</li>
+                <li><strong>Preferred Folders:</strong> Letting users designate a "Source of Truth" folder (e.g.,
+                    <code>/Archived_Work/</code>) to protect it from any automated suggestions.</li>
+            </ul>
+        </section>
+
+        <!-- 14. Key Product Management Takeaways -->
+        <section>
+            <h2>14. Product Management Takeaways</h2>
+            <p>This project taught me that <strong>the best products solve an internal itch.</strong> By building for
+                myself as a creator, I was able to identify the "Deletion Anxiety" friction point that generic tools
+                completely missed.</p>
+            <div class="insight-box" style="border-left-color: var(--brand-highlight);">
+                <strong>Final Lesson: Performance is UX</strong>
+                In utility tools, the speed of the UI is the strongest signal of "Quality" and "Trust" you can give a
+                user. Stability doesn't just prevent crashes; it builds the user's confidence to act.
+            </div>
+            <p><strong>Final Reflection:</strong> Good PM work isn't about the quantity of features; it's about the
+                quality of the decisions *not* to add features that distract from the core utility.</p>
+        </section>
+
+    </div>
+
+    <footer>
+        <div class="container">
+            <span class="footer-title">PRODUCT LEADERSHIP.</span>
+            <p style="opacity: 0.7; margin-bottom: 48px; font-weight: 300;">Architecting stable, high-performance
+                solutions for the creative economy through technical empathy.</p>
+            <a href="mailto:portfolio@example.com" class="footer-link">Let's build together.</a>
+        </div>
+    </footer>
+
+    <script>
+        function swap(el) {
+            document.querySelectorAll('.sim-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        const revealObs = new IntersectionObserver((es) => {
+            es.forEach(e => { if (e.isIntersecting) e.target.classList.add('active'); });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.section-reveal').forEach(s => revealObs.observe(s));
+    </script>
+</body>
+
+</html>

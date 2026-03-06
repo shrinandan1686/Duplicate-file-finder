@@ -1,33 +1,27 @@
-"""
-Main Window for Duplicate File Finder.
-Provides the primary user interface for folder selection and scanning.
-"""
-
 import sys
 import os
 from typing import List
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QLabel, QProgressBar, QCheckBox, QFileDialog,
-    QGroupBox, QMessageBox, QSlider, QSpinBox
+    QGroupBox, QMessageBox, QSlider, QSpinBox, QFrame
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon, QColor
 
 from file_scanner import FileScanner, FileInfo
 from deduplication_engine import DeduplicationEngine, DuplicateGroup
 from ui_results_view import ResultsView
 from logger import get_logger
+import ui_styles
 import json
 
 logger = get_logger()
 
-
 class ScanThread(QThread):
     """Background thread for scanning files."""
-    
-    progress = pyqtSignal(int, str)  # files_scanned, current_path
-    finished = pyqtSignal(list, list)  # files, duplicate_groups
+    progress = pyqtSignal(int, str)
+    finished = pyqtSignal(list, list)
     error = pyqtSignal(str)
     
     def __init__(self, root_paths: List[str], use_perceptual: bool, parent=None):
@@ -36,36 +30,28 @@ class ScanThread(QThread):
         self.use_perceptual = use_perceptual
     
     def run(self):
-        """Run the scanning and deduplication process."""
         try:
-            # Step 1: Scan files
             scanner = FileScanner()
             files = scanner.scan_directories(
                 self.root_paths,
                 progress_callback=lambda count, path: self.progress.emit(count, path)
             )
-            
             if not files:
                 self.error.emit("No image files found in selected directories.")
                 return
-            
-            # Step 2: Find duplicates
             engine = DeduplicationEngine()
             duplicate_groups = engine.find_duplicates(
                 files,
                 use_perceptual=self.use_perceptual,
                 progress_callback=lambda current, total: self.progress.emit(current, f"Analyzing {current}/{total}")
             )
-            
             self.finished.emit(files, duplicate_groups)
-        
         except Exception as e:
             logger.error(f"Error during scan: {e}", exc_info=True)
             self.error.emit(str(e))
 
-
 class MainWindow(QMainWindow):
-    """Main application window."""
+    """Main application window overhauled with modern dark theme."""
     
     def __init__(self):
         super().__init__()
@@ -75,416 +61,207 @@ class MainWindow(QMainWindow):
         self.load_config()
     
     def init_ui(self):
-        """Initialize the user interface."""
         self.setWindowTitle("Duplicate File Finder")
-        self.setMinimumSize(900, 700)
+        self.setMinimumSize(1000, 750)
+        self.setStyleSheet(ui_styles.GLOBAL_STYLES)
         
-        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(25)
         
-        # Main layout
-        layout = QVBoxLayout(central_widget)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Title
+        # Header
+        header_layout = QHBoxLayout()
         title_label = QLabel("Duplicate File Finder")
-        title_font = QFont()
-        title_font.setPointSize(18)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        layout.addWidget(title_label)
+        title_label.setStyleSheet(f"font-size: 32px; font-weight: bold; color: {ui_styles.COLORS['primary']};")
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        main_layout.addLayout(header_layout)
         
-        # Folder selection group
-        folder_group = self.create_folder_selection_group()
-        layout.addWidget(folder_group)
+        # Content Splitter (Manual Layout)
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(30)
         
-        # Options group
-        options_group = self.create_options_group()
-        layout.addWidget(options_group)
+        # Left Panel: Folders
+        left_panel = QFrame()
+        left_panel.setStyleSheet(f"background-color: {ui_styles.COLORS['card_bg']}; border-radius: 12px; border: 1px solid {ui_styles.COLORS['border']};")
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(20, 20, 20, 20)
         
-        # Progress group
-        self.progress_group = self.create_progress_group()
-        self.progress_group.setVisible(False)
-        layout.addWidget(self.progress_group)
-        
-        # Scan button
-        self.scan_button = QPushButton("Start Scan")
-        self.scan_button.setMinimumHeight(40)
-        self.scan_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-            }
-        """)
-        self.scan_button.clicked.connect(self.start_scan)
-        
-        # Load previous results button
-        self.load_results_button = QPushButton("📁 Load Previous Results")
-        self.load_results_button.setMinimumHeight(40)
-        self.load_results_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #0b7dda;
-            }
-        """)
-        self.load_results_button.clicked.connect(self.load_previous_results)
-        
-        # Button layout
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(self.scan_button)
-        button_layout.addWidget(self.load_results_button)
-        layout.addLayout(button_layout)
-        
-        # Stretch to push everything to top
-        layout.addStretch()
-    
-    def create_folder_selection_group(self) -> QGroupBox:
-        """Create the folder selection group box."""
-        group = QGroupBox("Select Folders to Scan")
-        layout = QVBoxLayout()
-        
-        # Folder list
+        left_layout.addWidget(QLabel("<b>SCAN DIRECTORIES</b>"))
         self.folder_list = QListWidget()
-        self.folder_list.setMinimumHeight(150)
-        layout.addWidget(self.folder_list)
+        self.folder_list.setStyleSheet(f"background-color: {ui_styles.COLORS['bg']}; border: none; border-radius: 8px; padding: 10px; color: {ui_styles.COLORS['text']};")
+        left_layout.addWidget(self.folder_list)
         
-        # Buttons
-        button_layout = QHBoxLayout()
+        btn_h = QHBoxLayout()
+        self.add_btn = QPushButton("+ Add Folder")
+        self.add_btn.setStyleSheet(f"background-color: {ui_styles.COLORS['primary']}; color: white; padding: 12px; border-radius: 8px; font-weight: bold;")
+        self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_btn.clicked.connect(self.add_folder)
         
-        add_folder_btn = QPushButton("Add Folder")
-        add_folder_btn.clicked.connect(self.add_folder)
-        button_layout.addWidget(add_folder_btn)
+        self.clear_btn = QPushButton("Clear All")
+        self.clear_btn.setStyleSheet(f"background-color: transparent; color: {ui_styles.COLORS['text_dim']}; padding: 12px; border: 1px solid {ui_styles.COLORS['border']}; border-radius: 8px;")
+        self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_btn.clicked.connect(self.clear_folders)
         
-        remove_folder_btn = QPushButton("Remove Selected")
-        remove_folder_btn.clicked.connect(self.remove_folder)
-        button_layout.addWidget(remove_folder_btn)
+        btn_h.addWidget(self.add_btn)
+        btn_h.addWidget(self.clear_btn)
+        left_layout.addLayout(btn_h)
         
-        clear_folders_btn = QPushButton("Clear All")
-        clear_folders_btn.clicked.connect(self.clear_folders)
-        button_layout.addWidget(clear_folders_btn)
+        # Right Panel: Options
+        right_panel = QFrame()
+        right_panel.setStyleSheet(f"background-color: {ui_styles.COLORS['card_bg']}; border-radius: 12px; border: 1px solid {ui_styles.COLORS['border']};")
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addLayout(button_layout)
+        right_layout.addWidget(QLabel("<b>SCAN OPTIONS</b>"))
         
-        group.setLayout(layout)
-        return group
-    
-    def create_options_group(self) -> QGroupBox:
-        """Create the options group box."""
-        group = QGroupBox("Scan Options")
-        layout = QVBoxLayout()
+        self.hidden_folders_checkbox = QCheckBox("Search Hidden Folders")
+        right_layout.addWidget(self.hidden_folders_checkbox)
         
-        # Include hidden folders checkbox
-        self.hidden_folders_checkbox = QCheckBox("Include hidden/system folders")
-        layout.addWidget(self.hidden_folders_checkbox)
-        
-        # Perceptual hashing checkbox
-        self.perceptual_checkbox = QCheckBox("Enable perceptual hashing (find similar images)")
+        self.perceptual_checkbox = QCheckBox("Find Similar (Visually)")
         self.perceptual_checkbox.toggled.connect(self.on_perceptual_toggled)
-        layout.addWidget(self.perceptual_checkbox)
+        right_layout.addWidget(self.perceptual_checkbox)
         
-        # Similarity threshold (only visible when perceptual is enabled)
-        threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel("Similarity threshold:"))
-        
+        right_layout.addSpacing(20)
+        right_layout.addWidget(QLabel("Similarity Strictness:"))
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setMinimum(1)
         self.threshold_slider.setMaximum(10)
         self.threshold_slider.setValue(5)
-        self.threshold_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.threshold_slider.setTickInterval(1)
-        self.threshold_slider.valueChanged.connect(self.on_threshold_changed)
         self.threshold_slider.setEnabled(False)
-        threshold_layout.addWidget(self.threshold_slider)
+        self.threshold_slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{ height: 6px; background: {ui_styles.COLORS['border']}; border-radius: 3px; }}
+            QSlider::handle:horizontal {{ background: {ui_styles.COLORS['primary']}; width: 18px; height: 18px; margin: -6px 0; border-radius: 9px; }}
+        """)
+        right_layout.addWidget(self.threshold_slider)
         
-        self.threshold_label = QLabel("5")
-        self.threshold_label.setMinimumWidth(30)
-        threshold_layout.addWidget(self.threshold_label)
+        right_layout.addStretch()
         
-        layout.addLayout(threshold_layout)
+        self.load_recent_btn = QPushButton("📁 Load Previous Results")
+        self.load_recent_btn.setStyleSheet(f"background-color: transparent; color: {ui_styles.COLORS['text']}; padding: 14px; border: 1px solid {ui_styles.COLORS['border']}; border-radius: 10px;")
+        self.load_recent_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.load_recent_btn.clicked.connect(self.load_previous_results)
+        right_layout.addWidget(self.load_recent_btn)
         
-        help_label = QLabel("Note: Lower threshold = more strict matching")
-        help_label.setStyleSheet("color: #666; font-size: 10px;")
-        layout.addWidget(help_label)
+        content_layout.addWidget(left_panel, 2)
+        content_layout.addWidget(right_panel, 1)
+        main_layout.addLayout(content_layout)
         
-        group.setLayout(layout)
-        return group
-    
-    def create_progress_group(self) -> QGroupBox:
-        """Create the progress group box."""
-        group = QGroupBox("Scan Progress")
-        layout = QVBoxLayout()
-        
-        # Progress bar
+        # Progress & Action Area
+        self.progress_area = QWidget()
+        self.progress_area.setVisible(False)
+        p_layout = QVBoxLayout(self.progress_area)
         self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setMaximum(100)
-        layout.addWidget(self.progress_bar)
+        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setStyleSheet(f"QProgressBar {{ background: {ui_styles.COLORS['border']}; border-radius: 4px; }} QProgressBar::chunk {{ background: {ui_styles.COLORS['primary']}; border-radius: 4px; }}")
+        self.progress_bar.setTextVisible(False)
+        self.status_label = QLabel("Ready...")
+        p_layout.addWidget(self.status_label)
+        p_layout.addWidget(self.progress_bar)
+        main_layout.addWidget(self.progress_area)
         
-        # Status label
-        self.status_label = QLabel("Ready to scan...")
-        layout.addWidget(self.status_label)
-        
-        # Files scanned counter
-        self.files_label = QLabel("Files scanned: 0")
-        layout.addWidget(self.files_label)
-        
-        group.setLayout(layout)
-        return group
-    
-    def load_config(self):
-        """Load configuration and set default values."""
-        try:
-            with open("config.json", 'r') as f:
-                config = json.load(f)
-            
-            # Set default options
-            scan_options = config.get('scan_options', {})
-            self.hidden_folders_checkbox.setChecked(
-                scan_options.get('include_hidden_folders', False)
-            )
-            
-            perceptual = config.get('perceptual_hash', {})
-            self.perceptual_checkbox.setChecked(
-                perceptual.get('enabled', False)
-            )
-            threshold = perceptual.get('similarity_threshold', 5)
-            self.threshold_slider.setValue(threshold)
-            self.threshold_label.setText(str(threshold))
-        
-        except Exception as e:
-            logger.warning(f"Unable to load config: {e}")
-    
-    def on_perceptual_toggled(self, checked: bool):
-        """Handle perceptual checkbox toggle."""
+        self.scan_btn = QPushButton("START SCAN")
+        self.scan_btn.setFixedHeight(65)
+        self.scan_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {ui_styles.COLORS['primary']};
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border-radius: 12px;
+            }}
+            QPushButton:hover {{ background-color: {ui_styles.COLORS['primary_hover']}; }}
+            QPushButton:disabled {{ background-color: #333; color: #666; }}
+        """)
+        self.scan_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.scan_btn.clicked.connect(self.start_scan)
+        main_layout.addWidget(self.scan_btn)
+
+    def on_perceptual_toggled(self, checked):
         self.threshold_slider.setEnabled(checked)
-    
-    def on_threshold_changed(self, value: int):
-        """Handle threshold slider change."""
-        self.threshold_label.setText(str(value))
-    
+
     def add_folder(self):
-        """Open folder dialog and add selected folder."""
-        folder = QFileDialog.getExistingDirectory(
-            self, 
-            "Select Folder to Scan",
-            "",
-            QFileDialog.Option.ShowDirsOnly
-        )
-        
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder to Scan")
         if folder and folder not in self.selected_folders:
             self.selected_folders.append(folder)
             self.folder_list.addItem(folder)
-    
-    def remove_folder(self):
-        """Remove selected folder from list."""
-        current_row = self.folder_list.currentRow()
-        if current_row >= 0:
-            self.folder_list.takeItem(current_row)
-            del self.selected_folders[current_row]
-    
+
     def clear_folders(self):
-        """Clear all folders from list."""
         self.folder_list.clear()
         self.selected_folders.clear()
-    
+
     def start_scan(self):
-        """Start the scanning process."""
         if not self.selected_folders:
-            QMessageBox.warning(
-                self,
-                "No Folders Selected",
-                "Please select at least one folder to scan."
-            )
+            QMessageBox.warning(self, "No Folders", "Please select folders to scan.")
             return
         
-        # Update config with current options
-        self.update_config()
-        
-        # Show progress group
-        self.progress_group.setVisible(True)
-        self.scan_button.setEnabled(False)
+        self.progress_area.setVisible(True)
+        self.scan_btn.setEnabled(False)
         self.progress_bar.setValue(0)
         self.status_label.setText("Starting scan...")
         
-        # Start scan thread
-        self.scan_thread = ScanThread(
-            self.selected_folders,
-            self.perceptual_checkbox.isChecked()
-        )
+        self.scan_thread = ScanThread(self.selected_folders, self.perceptual_checkbox.isChecked())
         self.scan_thread.progress.connect(self.on_scan_progress)
         self.scan_thread.finished.connect(self.on_scan_finished)
         self.scan_thread.error.connect(self.on_scan_error)
         self.scan_thread.start()
-    
-    def update_config(self):
-        """Update config file with current options."""
-        try:
-            with open("config.json", 'r') as f:
-                config = json.load(f)
-            
-            config['scan_options']['include_hidden_folders'] = self.hidden_folders_checkbox.isChecked()
-            config['perceptual_hash']['enabled'] = self.perceptual_checkbox.isChecked()
-            config['perceptual_hash']['similarity_threshold'] = self.threshold_slider.value()
-            
-            with open("config.json", 'w') as f:
-                json.dump(config, f, indent=2)
-        
-        except Exception as e:
-            logger.warning(f"Unable to update config: {e}")
-    
-    def on_scan_progress(self, count: int, message: str):
-        """Handle scan progress updates."""
-        self.files_label.setText(f"Files processed: {count}")
+
+    def on_scan_progress(self, count, message):
         self.status_label.setText(message)
-        # Pulse progress bar during scan
-        self.progress_bar.setValue((count % 100))
-    
-    def on_scan_finished(self, files: List[FileInfo], duplicate_groups: List[DuplicateGroup]):
-        """Handle scan completion."""
-        self.scan_button.setEnabled(True)
-        self.progress_bar.setValue(100)
-        
-        if not duplicate_groups:
-            QMessageBox.information(
-                self,
-                "No Duplicates Found",
-                f"Scanned {len(files)} files.\n\nNo duplicate files were found."
-            )
-            self.progress_group.setVisible(False)
+        self.progress_bar.setValue(count % 100)
+
+    def on_scan_finished(self, files, groups):
+        self.scan_btn.setEnabled(True)
+        self.progress_area.setVisible(False)
+        if not groups:
+            QMessageBox.information(self, "No Duplicates", f"Scanned {len(files)} files. No duplicates found.")
             return
-        
-        # Calculate statistics
-        total_duplicates = sum(len(group.files) for group in duplicate_groups)
-        total_wasted = sum(group.get_total_wasted_space() for group in duplicate_groups)
-        from utils import format_bytes
-        
-        self.status_label.setText(
-            f"Found {len(duplicate_groups)} duplicate groups "
-            f"({total_duplicates} files, {format_bytes(total_wasted)} wasted)"
-        )
-        
-        # Open results view
-        self.open_results_view(duplicate_groups)
-    
-    def on_scan_error(self, error_message: str):
-        """Handle scan errors."""
-        self.scan_button.setEnabled(True)
-        self.progress_group.setVisible(False)
-        
-        QMessageBox.critical(
-            self,
-            "Scan Error",
-            f"An error occurred during scanning:\n\n{error_message}"
-        )
-    
-    def open_results_view(self, duplicate_groups: List[DuplicateGroup]):
-        """Open the results view window."""
-        results_window = ResultsView(duplicate_groups, self)
-        results_window.show()
-    
+        self.open_results_view(groups)
+
+    def on_scan_error(self, error):
+        self.scan_btn.setEnabled(True)
+        self.progress_area.setVisible(False)
+        QMessageBox.critical(self, "Error", f"An error occurred: {error}")
+
+    def open_results_view(self, groups):
+        self.results_window = ResultsView(groups, self)
+        self.results_window.show()
+
     def load_previous_results(self):
-        """Load previously saved scan results from JSON file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Load Previous Results",
-            "",
-            "JSON Files (*.json);;All Files (*)"
-        )
-        
-        if not file_path:
-            return
-        
+        path, _ = QFileDialog.getOpenFileName(self, "Load Results", "", "JSON (*.json)")
+        if not path: return
         try:
-            # Load JSON file
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
-            # Check if it's a valid duplicate results file
-            if 'groups' not in data:
-                QMessageBox.warning(
-                    self,
-                    "Invalid File",
-                    "This file doesn't appear to be a valid duplicate scan result."
-                )
-                return
-            
-            # Reconstruct DuplicateGroup objects from JSON
-            duplicate_groups = []
-            for group_data in data['groups']:
-                # Reconstruct FileInfo objects
+            groups = []
+            for g_data in data['groups']:
                 files = []
-                for file_data in group_data['files']:
-                    file_info = FileInfo(
-                        path=file_data['path'],
-                        size=file_data['size'],
-                        extension=file_data['extension'],
-                        resolution=tuple(file_data['resolution']) if file_data['resolution'] else None,
-                        created_time=file_data['created_time'],
-                        modified_time=file_data['modified_time']
-                    )
-                    files.append(file_info)
-                
-                # Create DuplicateGroup
-                group = DuplicateGroup(
-                    files=files,
-                    detection_method=group_data['detection_method'],
-                    similarity_score=group_data.get('similarity_score', 100.0)
-                )
-                duplicate_groups.append(group)
-            
-            if not duplicate_groups:
-                QMessageBox.information(
-                    self,
-                    "No Results",
-                    "The loaded file contains no duplicate groups."
-                )
-                return
-            
-            # Show success message
-            total_files = sum(len(group.files) for group in duplicate_groups)
-            total_wasted = sum(group.get_total_wasted_space() for group in duplicate_groups)
-            from utils import format_bytes
-            
-            QMessageBox.information(
-                self,
-                "Results Loaded",
-                f"Successfully loaded {len(duplicate_groups)} duplicate groups\n"
-                f"({total_files} files, {format_bytes(total_wasted)} wasted space)\n\n"
-                f"From: {os.path.basename(file_path)}"
-            )
-            
-            # Open results view
-            self.open_results_view(duplicate_groups)
-        
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            QMessageBox.critical(
-                self,
-                "Invalid JSON",
-                f"Failed to parse JSON file:\n{str(e)}"
-            )
-        
+                for f_data in g_data['files']:
+                    # Filter only fields that the FileInfo constructor expects
+                    valid_keys = {'path', 'size', 'extension', 'resolution', 'created_time', 'modified_time'}
+                    filtered_data = {k: v for k, v in f_data.items() if k in valid_keys}
+                    
+                    # Ensure resolution is a tuple as expected by FileInfo dataclass
+                    if filtered_data.get('resolution'):
+                        filtered_data['resolution'] = tuple(filtered_data['resolution'])
+                        
+                    files.append(FileInfo(**filtered_data))
+                groups.append(DuplicateGroup(files=files, detection_method=g_data['detection_method']))
+            self.open_results_view(groups)
         except Exception as e:
-            logger.error(f"Error loading results: {e}", exc_info=True)
-            QMessageBox.critical(
-                self,
-                "Load Error",
-                f"An error occurred while loading results:\n{str(e)}"
-            )
+            logger.error(f"Failed to load results: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to load: {e}")
+
+    def load_config(self):
+        """Load configuration/set defaults."""
+        try:
+            if os.path.exists("config.json"):
+                with open("config.json", 'r') as f:
+                    config = json.load(f)
+                self.hidden_folders_checkbox.setChecked(config.get('scan_options', {}).get('include_hidden_folders', False))
+                self.perceptual_checkbox.setChecked(config.get('perceptual_hash', {}).get('enabled', False))
+                self.threshold_slider.setValue(config.get('perceptual_hash', {}).get('similarity_threshold', 5))
+        except Exception as e:
+            logger.warning(f"Config load error: {e}")

@@ -1,17 +1,15 @@
-"""
-Results View for Duplicate File Finder.
-Displays duplicate groups and allows user to select files for deletion.
-"""
-
 import os
-from typing import List, Dict
+import json
+from enum import Enum
+from typing import List, Dict, Optional, Tuple
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QScrollArea, QGroupBox, QCheckBox, QTableWidget,
-    QTableWidgetItem, QHeaderView, QMessageBox, QFileDialog, QComboBox
+    QLabel, QScrollArea, QFrame, QCheckBox, QMessageBox, QFileDialog, 
+    QComboBox, QSplitter, QSizePolicy, QGraphicsDropShadowEffect,
+    QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QFont, QIcon
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPropertyAnimation, QEasingCurve, QThreadPool, QRunnable, QObject, QTimer
+from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QPalette
 
 from deduplication_engine import DuplicateGroup
 from file_scanner import FileInfo
@@ -20,472 +18,568 @@ from suggestion_engine import SuggestionEngine
 from ui_dialogs import DeletionConfirmationDialog
 from utils import format_bytes, generate_thumbnail
 from logger import get_logger
-import json
+import ui_styles
 
 logger = get_logger()
 
+class ThumbnailSignals(QObject):
+    finished = pyqtSignal(str)
 
-class DuplicateGroupWidget(QGroupBox):
-    """Widget to display a single duplicate group."""
-    
+class ThumbnailWorker(QRunnable):
+    """Worker for background thumbnail generation."""
+    def __init__(self, file_path: str):
+        super().__init__()
+        self.file_path = file_path
+        self.signals = ThumbnailSignals()
+
+    def run(self):
+        try:
+            thumb_path = generate_thumbnail(self.file_path)
+            if thumb_path:
+                self.signals.finished.emit(thumb_path)
+        except Exception as e:
+            logger.error(f"Thumbnail error: {e}")
+
+class CardState(Enum):
+    NEUTRAL = "neutral"
+    RECOMMENDED = "recommended"
+    DELETE = "delete"
+
+class ImageCard(QFrame):
+    """Modern image card with async thumbnail and metadata."""
+    clicked = pyqtSignal(FileInfo)
+    stateChanged = pyqtSignal(FileInfo, CardState)
+
+    def __init__(self, file_info: FileInfo, is_recommended: bool, reason: str = "", parent=None):
+        super().__init__(parent)
+        self.file_info = file_info
+        self.is_recommended = is_recommended
+        self.reason = reason
+        self.state = CardState.RECOMMENDED if is_recommended else CardState.DELETE
+        self.setObjectName("ImageCard")
+        self.setProperty("state", self.state.value)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.init_ui()
+        self.start_loading_thumbnail()
+
+    def init_ui(self):
+        self.setFixedSize(180, 260)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # Thumbnail Placeholder
+        self.thumbnail_label = QLabel()
+        self.thumbnail_label.setObjectName("Thumbnail")
+        self.thumbnail_label.setFixedSize(164, 140)
+        self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.thumbnail_label.setText("Loading...")
+        
+        # Opacity Effect for Fade-in
+        self.opacity_effect = QGraphicsOpacityEffect(self.thumbnail_label)
+        self.opacity_effect.setOpacity(0)
+        self.thumbnail_label.setGraphicsEffect(self.opacity_effect)
+        
+        layout.addWidget(self.thumbnail_label)
+
+        # Badge (Original/Copy)
+        self.badge = QLabel("ORIGINAL" if self.is_recommended else "COPY")
+        self.badge.setObjectName("Badge" if self.is_recommended else "BadgeCopy")
+        self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.badge)
+        
+        self.reason_label = QLabel(self.reason if self.is_recommended else "")
+        self.reason_label.setObjectName("MetadataLabel")
+        self.reason_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.reason_label)
+
+        # Metadata
+        name_label = QLabel(os.path.basename(self.file_info.path))
+        name_label.setObjectName("FileNameLabel")
+        name_label.setToolTip(self.file_info.path)
+        layout.addWidget(name_label)
+
+        res = self.file_info.resolution
+        res_str = f"{res[0]}x{res[1]}" if res else "Unknown"
+        meta_str = f"{res_str} • {format_bytes(self.file_info.size)}"
+        meta_label = QLabel(meta_str)
+        meta_label.setObjectName("MetadataLabel")
+        layout.addWidget(meta_label)
+
+        path_label = QLabel(os.path.dirname(self.file_info.path))
+        path_label.setObjectName("MetadataLabel")
+        path_label.setWordWrap(True)
+        layout.addWidget(path_label)
+
+        self.setStyleSheet(ui_styles.IMAGE_CARD_STYLE)
+        self.update_state_ui()
+
+    def start_loading_thumbnail(self):
+        worker = ThumbnailWorker(self.file_info.path)
+        worker.signals.finished.connect(self.on_thumbnail_ready)
+        QThreadPool.globalInstance().start(worker)
+
+    def on_thumbnail_ready(self, path: str):
+        if os.path.exists(path):
+            pix = QPixmap(path)
+            self.thumbnail_label.setPixmap(pix.scaled(
+                160, 136, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
+            
+            # Fade-in Animation
+            self.fade_anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+            self.fade_anim.setDuration(400)
+            self.fade_anim.setStartValue(0)
+            self.fade_anim.setEndValue(1)
+            self.fade_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.fade_anim.start()
+        else:
+            self.thumbnail_label.setText("No Preview")
+            self.opacity_effect.setOpacity(1)
+
+    def enterEvent(self, event):
+        # Scale up slightly on hover
+        self.anim = QPropertyAnimation(self, b"minimumSize")
+        self.anim.setDuration(150)
+        self.anim.setEndValue(QSize(185, 265))
+        self.anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.anim.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        # Scale back down
+        self.anim = QPropertyAnimation(self, b"minimumSize")
+        self.anim.setDuration(150)
+        self.anim.setEndValue(QSize(180, 260))
+        self.anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.anim.start()
+        super().leaveEvent(event)
+
+    def update_state_ui(self):
+        self.setProperty("state", self.state.value)
+        is_orig = (self.state == CardState.RECOMMENDED)
+        self.badge.setText("ORIGINAL" if is_orig else "COPY")
+        self.badge.setObjectName("Badge" if is_orig else "BadgeCopy")
+        self.badge.style().unpolish(self.badge)
+        self.badge.style().polish(self.badge)
+        
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit(self.file_info)
+        self.set_state(CardState.RECOMMENDED)
+        super().mousePressEvent(event)
+
+    def toggle_state(self):
+        if self.state == CardState.RECOMMENDED:
+            self.set_state(CardState.DELETE)
+        else:
+            self.set_state(CardState.RECOMMENDED)
+
+    def set_state(self, state: CardState):
+        if self.state != state:
+            self.state = state
+            self.update_state_ui()
+            self.stateChanged.emit(self.file_info, self.state)
+
+
+class DuplicateGroupCard(QFrame):
+    """Card representing a group of duplicates with collapsible content."""
+    selectionChanged = pyqtSignal()
+    imageClicked = pyqtSignal(FileInfo)
+
     def __init__(self, group: DuplicateGroup, group_number: int, strategy: str, parent=None):
         super().__init__(parent)
         self.group = group
         self.group_number = group_number
         self.strategy = strategy
-        self.checkboxes: Dict[str, QCheckBox] = {}
+        self.setObjectName("GroupCard")
+        self.cards: Dict[str, ImageCard] = {}
+        self.is_collapsed = False
         self.init_ui()
-    
+
     def init_ui(self):
-        """Initialize the UI for this group."""
-        # Get suggestion
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 15)
+        self.main_layout.setSpacing(0)
+
+        # Header
+        self.header = QFrame()
+        self.header.setObjectName("GroupHeader")
+        self.header.setCursor(Qt.CursorShape.PointingHandCursor)
+        header_layout = QHBoxLayout(self.header)
+        
+        self.title_label = QLabel()
+        header_layout.addWidget(self.title_label)
+        
+        header_layout.addStretch()
+        
+        self.status_icon = QLabel("▼")
+        header_layout.addWidget(self.status_icon)
+        
+        self.main_layout.addWidget(self.header)
+
+        # Content Container
+        self.content_container = QWidget()
+        content_v_layout = QVBoxLayout(self.content_container)
+        content_v_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFixedHeight(280)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(15, 10, 15, 10)
+        content_layout.setSpacing(15)
+
         suggestion_engine = SuggestionEngine()
         keeper, reason = suggestion_engine.suggest_keeper(self.group.files, self.strategy)
-        
-        # Group title - clearer formatting
-        wasted = format_bytes(self.group.get_total_wasted_space())
-        group_title = (
-            f"Group {self.group_number}: {len(self.group.files)} duplicates  •  "
-            f"💾 {wasted} can be freed"
-        )
-        self.setTitle(group_title)
-        
-        # Style the group box
-        self.setStyleSheet("""
-            QGroupBox {
-                font-size: 13px;
-                font-weight: bold;
-                border: 2px solid #555;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 15px;
-                background-color: #2b2b2b;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 10px;
-                color: #4CAF50;
-            }
-        """)
-        
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
-        
-        # CLEANER TABLE: Only essential columns
-        table = QTableWidget()
-        table.setColumnCount(5)
-        table.setHorizontalHeaderLabels([
-            "✓", "Preview", "Full Path", "Size", "Keep?"
-        ])
-        table.setRowCount(len(self.group.files))
-        
-        # Configure table for better visibility
-        table.verticalHeader().setVisible(False)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        table.setAlternatingRowColors(True)
-        table.setShowGrid(True)
-        
-        # Style the table
-        table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e1e1e;
-                alternate-background-color: #252525;
-                gridline-color: #404040;
-                font-size: 11px;
-            }
-            QTableWidget::item {
-                padding: 5px;
-            }
-            QHeaderView::section {
-                background-color: #333;
-                color: white;
-                font-weight: bold;
-                padding: 8px;
-                border: 1px solid #555;
-            }
-        """)
-        
-        # Populate table with clearer layout
-        for i, file_info in enumerate(self.group.files):
-            is_suggested = (file_info.path == keeper.path)
-            
-            # Checkbox - for deletion selection
-            checkbox = QCheckBox()
-            if not is_suggested:
-                checkbox.setChecked(True)  # Pre-select for deletion (NOT the keeper)
-            checkbox.setToolTip("Check to delete this file")
-            self.checkboxes[file_info.path] = checkbox
-            checkbox_widget = QWidget()
-            checkbox_layout = QHBoxLayout(checkbox_widget)
-            checkbox_layout.addWidget(checkbox)
-            checkbox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            checkbox_layout.setContentsMargins(0, 0, 0, 0)
-            table.setCellWidget(i, 0, checkbox_widget)
-            
-            # Larger thumbnail for better visibility
-            thumbnail_label = QLabel()
-            thumbnail_path = generate_thumbnail(file_info.path)
-            if thumbnail_path and os.path.exists(thumbnail_path):
-                pixmap = QPixmap(thumbnail_path)
-                scaled_pixmap = pixmap.scaled(
-                    120, 120,  # Larger thumbnail
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                thumbnail_label.setPixmap(scaled_pixmap)
-            else:
-                thumbnail_label.setText("No\nPreview")
-                thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            table.setCellWidget(i, 1, thumbnail_label)
-            
-            # FULL PATH - This is what user wants to see!
-            path_item = QTableWidgetItem(file_info.path)
-            path_item.setToolTip(f"Click to copy path\n{file_info.path}")
-            
-            # Color code the suggested keeper
-            if is_suggested:
-                path_item.setBackground(Qt.GlobalColor.darkGreen)
-                path_item.setForeground(Qt.GlobalColor.white)
-            
-            table.setItem(i, 2, path_item)
-            
-            # Size
-            size_item = QTableWidgetItem(format_bytes(file_info.size))
-            if is_suggested:
-                size_item.setBackground(Qt.GlobalColor.darkGreen)
-                size_item.setForeground(Qt.GlobalColor.white)
-            table.setItem(i, 3, size_item)
-            
-            # Clear "Keep" indicator with reasoning
-            if is_suggested:
-                keep_text = f"⭐ KEEP\n{reason}"
-                keep_item = QTableWidgetItem(keep_text)
-                keep_item.setFont(QFont("", -1, QFont.Weight.Bold))
-                keep_item.setBackground(Qt.GlobalColor.darkGreen)
-                keep_item.setForeground(Qt.GlobalColor.white)
-                keep_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            else:
-                keep_item = QTableWidgetItem("Delete")
-                keep_item.setForeground(Qt.GlobalColor.lightGray)
-                keep_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            table.setItem(i, 4, keep_item)
-        
-        # Resize columns for better visibility
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Checkbox
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Thumbnail
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Path (takes most space)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Size
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Keep?
-        
-        # Taller rows for better thumbnail visibility
-        for i in range(len(self.group.files)):
-            table.setRowHeight(i, 130)
-        
-        layout.addWidget(table)
-        
-        # SIMPLIFIED BUTTONS - Single row, clearer labels
-        button_layout = QHBoxLayout()
-        
-        # Info label
-        info_label = QLabel(f"💡 Green row = Suggested file to KEEP")
-        info_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 11px;")
-        button_layout.addWidget(info_label)
-        
-        button_layout.addStretch()
-        
-        # Quick actions
-        keep_suggested_btn = QPushButton("✓ Keep Only Suggested")
-        keep_suggested_btn.setToolTip("Select all files EXCEPT the suggested keeper for deletion")
-        keep_suggested_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                padding: 8px 15px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        keep_suggested_btn.clicked.connect(lambda: self.select_except_suggested(keeper.path))
-        button_layout.addWidget(keep_suggested_btn)
-        
-        clear_btn = QPushButton("Clear Selection")
-        clear_btn.clicked.connect(self.deselect_all)
-        button_layout.addWidget(clear_btn)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-    
-    def select_except_suggested(self, keeper_path: str):
-        """Select all files except the suggested keeper."""
-        for path, checkbox in self.checkboxes.items():
-            checkbox.setChecked(path != keeper_path)
-    
-    def select_all(self):
-        """Select all files in this group."""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(True)
-    
-    def deselect_all(self):
-        """Deselect all files in this group."""
-        for checkbox in self.checkboxes.values():
-            checkbox.setChecked(False)
-    
-    def get_selected_files(self) -> List[FileInfo]:
-        """Get list of selected files."""
-        selected = []
-        for file_info in self.group.files:
-            if self.checkboxes[file_info.path].isChecked():
-                selected.append(file_info)
-        return selected
 
+        for file_info in self.group.files:
+            is_rec = (file_info.path == keeper.path)
+            card = ImageCard(file_info, is_rec, reason if is_rec else "")
+            card.stateChanged.connect(self.on_card_state_changed)
+            card.clicked.connect(self.imageClicked.emit)
+            self.cards[file_info.path] = card
+            content_layout.addWidget(card)
+
+        content_layout.addStretch()
+        self.scroll_area.setWidget(content_widget)
+        content_v_layout.addWidget(self.scroll_area)
+        
+        self.main_layout.addWidget(self.content_container)
+
+        self.setStyleSheet(ui_styles.GROUP_CARD_STYLE)
+        self.header.mousePressEvent = self.toggle_collapse
+        self.update_header()
+
+    def update_header(self):
+        wasted = format_bytes(self.group.get_total_wasted_space())
+        selected = self.get_selected_for_deletion()
+        reclaimable = format_bytes(sum(f.size for f in selected))
+        
+        status_text = f"Group #{self.group_number} • {len(self.group.files)} duplicates"
+        if selected:
+            status_text += f" • <span style='color: #4CAF50;'>{reclaimable} selected</span>"
+        else:
+            status_text += f" • {wasted} total"
+        self.title_label.setText(status_text)
+
+    def toggle_collapse(self, event=None):
+        self.is_collapsed = not self.is_collapsed
+        self.status_icon.setText("►" if self.is_collapsed else "▼")
+        
+        # Smooth collapse animation
+        start_height = self.content_container.height()
+        end_height = 0 if self.is_collapsed else 280 # 280 is the fixedHeight set in init_ui
+        
+        self.anim = QPropertyAnimation(self.content_container, b"maximumHeight")
+        self.anim.setDuration(300)
+        self.anim.setStartValue(start_height)
+        self.anim.setEndValue(end_height)
+        self.anim.setEasingCurve(QEasingCurve.Type.InOutQuart)
+        self.anim.start()
+        
+        self.update_header()
+
+    def on_card_state_changed(self, file_info: FileInfo, new_state: CardState):
+        """Implement Smart Selection: Only one KEEP per group."""
+        if new_state == CardState.RECOMMENDED:
+            # Mark all others as DELETE
+            for path, card in self.cards.items():
+                if path != file_info.path:
+                    card.set_state(CardState.DELETE)
+        self.update_header()
+        self.selectionChanged.emit()
+
+    def deselect_all(self):
+        for card in self.cards.values():
+            card.set_state(CardState.NEUTRAL)
+        self.update_header()
+        self.selectionChanged.emit()
+
+    def get_selected_for_deletion(self) -> List[FileInfo]:
+        return [c.file_info for c in self.cards.values() if c.state == CardState.DELETE]
 
 class ResultsView(QMainWindow):
-    """Results view window displaying duplicate groups."""
+    """Overhauled main results window with batch loading for performance."""
     
     def __init__(self, duplicate_groups: List[DuplicateGroup], parent=None):
         super().__init__(parent)
         self.duplicate_groups = duplicate_groups
-        self.group_widgets: List[DuplicateGroupWidget] = []
+        self.group_widgets: List[DuplicateGroupCard] = []
         self.strategy = 'keep_highest_resolution'
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize the UI."""
-        self.setWindowTitle("Duplicate Files Found")
-        self.setMinimumSize(1200, 800)
         
-        # Central widget
+        # Incremental Loading State
+        self.batch_index = 0
+        self.batch_size = 15
+        self.load_timer = QTimer()
+        self.load_timer.timeout.connect(self.load_next_batch)
+        
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Results - Duplicate File Finder")
+        self.setMinimumSize(1300, 900)
+        self.setStyleSheet(ui_styles.GLOBAL_STYLES)
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 1. Top Summary Bar
+        summary_bar = QWidget()
+        summary_bar.setObjectName("SummaryBar")
+        summary_bar.setFixedHeight(85)
+        summary_bar.setStyleSheet(ui_styles.SUMMARY_BAR_STYLE)
+        summary_layout = QVBoxLayout(summary_bar)
+        summary_layout.setSpacing(5)
         
-        # Main layout
-        layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(20, 20, 20, 20)
+        top_h = QHBoxLayout()
+        self.stat_label = QLabel()
+        self.stat_label.setObjectName("StatLabel")
+        top_h.addWidget(self.stat_label)
         
-        # Header
-        header_layout = QHBoxLayout()
+        top_h.addStretch()
         
-        title_label = QLabel(f"Found {len(self.duplicate_groups)} Duplicate Groups")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        header_layout.addWidget(title_label)
+        clear_btn = QPushButton("Clear Selection")
+        clear_btn.setObjectName("SecondaryBtn")
+        clear_btn.setFixedWidth(140)
+        clear_btn.clicked.connect(self.clear_all_selection)
+        top_h.addWidget(clear_btn)
         
-        header_layout.addStretch()
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.setObjectName("ActionBtn")
+        self.delete_btn.clicked.connect(self.confirm_deletion)
+        top_h.addWidget(self.delete_btn)
         
-        # Strategy selector
-        header_layout.addWidget(QLabel("Suggestion strategy:"))
+        summary_layout.addLayout(top_h)
+
+        # Recovery Bar
+        bar_container = QWidget()
+        bar_layout = QHBoxLayout(bar_container)
+        bar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.recovery_bar = QFrame()
+        self.recovery_bar.setFixedHeight(6)
+        self.recovery_bar.setStyleSheet(f"background-color: {ui_styles.COLORS['border']}; border-radius: 3px;")
+        self.recovery_fill = QFrame(self.recovery_bar)
+        self.recovery_fill.setFixedHeight(6)
+        self.recovery_fill.setStyleSheet(f"background-color: {ui_styles.COLORS['primary']}; border-radius: 3px;")
+        
+        bar_layout.addWidget(self.recovery_bar)
+        summary_layout.addWidget(bar_container)
+        
+        main_layout.addWidget(summary_bar)
+
+        # 2. Bulk Action Toolbar
+        toolbar = QWidget()
+        toolbar.setFixedHeight(50)
+        toolbar.setStyleSheet(f"background-color: {ui_styles.COLORS['bg']}; border-bottom: 1px solid {ui_styles.COLORS['border']};")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(20, 0, 20, 0)
+        
+        toolbar_layout.addWidget(QLabel("Auto Select Best:"))
         self.strategy_combo = QComboBox()
         self.strategy_combo.addItems([
-            "Keep Highest Resolution",
-            "Keep Oldest",
-            "Keep Newest",
-            "Keep Shortest Path"
+            "Keep Highest Resolution", "Keep Newest", "Keep Oldest", "Keep Shortest Path"
         ])
+        self.strategy_combo.setFixedWidth(200)
         self.strategy_combo.currentTextChanged.connect(self.on_strategy_changed)
-        header_layout.addWidget(self.strategy_combo)
+        toolbar_layout.addWidget(self.strategy_combo)
         
-        layout.addLayout(header_layout)
+        toolbar_layout.addStretch()
         
-        # Scroll area for groups
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        main_layout.addWidget(toolbar)
+
+        # 3. Main Content - Splitter for Sidebar
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
+        # Results List
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.results_container = QWidget()
+        self.results_layout = QVBoxLayout(self.results_container)
+        self.results_layout.setContentsMargins(24, 24, 24, 24)
+        self.results_layout.setSpacing(0)
         
-        # Create group widgets
-        self.create_group_widgets(scroll_layout)
+        self.scroll_area.setWidget(self.results_container)
+        self.splitter.addWidget(self.scroll_area)
         
-        scroll_layout.addStretch()
-        scroll_area.setWidget(scroll_widget)
-        layout.addWidget(scroll_area)
+        # Side Preview Panel (Initially Hidden)
+        self.preview_panel = QFrame()
+        self.preview_panel.setFixedWidth(400)
+        self.preview_panel.setStyleSheet(f"background-color: {ui_styles.COLORS['card_bg']}; border-left: 1px solid {ui_styles.COLORS['border']};")
+        self.preview_layout = QVBoxLayout(self.preview_panel)
         
-        # Bottom panel
-        bottom_layout = QHBoxLayout()
+        self.preview_image = QLabel()
+        self.preview_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_image.setStyleSheet("background-color: #000; border-radius: 8px;")
+        self.preview_image.setMinimumHeight(400)
         
-        # Summary label
-        self.summary_label = QLabel()
-        self.update_summary()
-        bottom_layout.addWidget(self.summary_label)
+        self.preview_meta = QLabel()
+        self.preview_meta.setWordWrap(True)
+        self.preview_meta.setStyleSheet(f"color: {ui_styles.COLORS['text']}; font-size: 13px; line-height: 1.5;")
         
-        bottom_layout.addStretch()
+        self.preview_layout.addWidget(self.preview_image)
+        self.preview_layout.addSpacing(20)
+        self.preview_layout.addWidget(self.preview_meta)
+        self.preview_layout.addStretch()
         
-        # Export button
-        export_btn = QPushButton("Export Results")
-        export_btn.clicked.connect(self.export_results)
-        bottom_layout.addWidget(export_btn)
+        self.preview_panel.hide()
+        self.splitter.addWidget(self.preview_panel)
         
-        # Delete button
-        delete_btn = QPushButton("Delete Selected Files")
-        delete_btn.setMinimumHeight(40)
-        delete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f44336;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 5px;
-                padding: 0 20px;
-            }
-            QPushButton:hover {
-                background-color: #da190b;
-            }
-        """)
-        delete_btn.clicked.connect(self.delete_selected)
-        bottom_layout.addWidget(delete_btn)
+        main_layout.addWidget(self.splitter)
+
+        # Initialize Data
+        self.batch_index = 0
+        self.batch_size = 15
+        self.load_timer = QTimer()
+        self.load_timer.timeout.connect(self.load_next_batch)
         
-        layout.addLayout(bottom_layout)
-    
-    def create_group_widgets(self, layout: QVBoxLayout):
-        """Create widgets for all duplicate groups."""
+        self.refresh_results()
+
+    def refresh_results(self):
+        # Clear existing
+        for i in reversed(range(self.results_layout.count())):
+            item = self.results_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
         self.group_widgets.clear()
         
-        for i, group in enumerate(self.duplicate_groups, 1):
-            group_widget = DuplicateGroupWidget(group, i, self.strategy)
-            self.group_widgets.append(group_widget)
-            layout.addWidget(group_widget)
-    
+        # Start incremental loading
+        self.batch_index = 0
+        self.stat_label.setText("Preparing results...")
+        self.load_timer.start(5) # Trigger every 5ms
+
+    def load_next_batch(self):
+        end = min(self.batch_index + self.batch_size, len(self.duplicate_groups))
+        
+        for i in range(self.batch_index, end):
+            group = self.duplicate_groups[i]
+            group_card = DuplicateGroupCard(group, i + 1, self.strategy)
+            group_card.selectionChanged.connect(self.update_summary)
+            group_card.imageClicked.connect(self.show_preview)
+            self.group_widgets.append(group_card)
+            self.results_layout.addWidget(group_card)
+        
+        self.batch_index = end
+        
+        # Update progress label
+        progress_pct = int((self.batch_index / len(self.duplicate_groups)) * 100)
+        self.stat_label.setText(f"Rendering Results... {progress_pct}%")
+
+        if self.batch_index >= len(self.duplicate_groups):
+            self.load_timer.stop()
+            self.results_layout.addStretch()
+            self.update_summary()
+
+    def show_preview(self, file_info: FileInfo):
+        self.preview_panel.show()
+        pixmap = QPixmap(file_info.path)
+        if not pixmap.isNull():
+            self.preview_image.setPixmap(pixmap.scaled(
+                380, 500, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
+        else:
+            self.preview_image.setText("Unable to load image")
+
+        res_str = f"{file_info.resolution[0]}x{file_info.resolution[1]}" if file_info.resolution else "Unknown"
+        meta_html = f"""
+            <h3 style='color: #4CAF50;'>File Details</h3>
+            <b>Name:</b> {os.path.basename(file_info.path)}<br><br>
+            <b>Resolution:</b> {res_str}<br><br>
+            <b>Size:</b> {format_bytes(file_info.size)}<br><br>
+            <b>Path:</b> {file_info.path}<br><br>
+            <b>Modified:</b> {os.path.getmtime(file_info.path) if os.path.exists(file_info.path) else ''}
+        """
+        self.preview_meta.setText(meta_html)
+
+    def update_summary(self):
+        total_selected = 0
+        total_reclaimable = 0
+        total_groups = len(self.duplicate_groups)
+        max_possible = sum(g.get_total_wasted_space() for g in self.duplicate_groups)
+        
+        for g in self.group_widgets:
+            selected = g.get_selected_for_deletion()
+            total_selected += len(selected)
+            total_reclaimable += sum(f.size for f in selected)
+
+        self.stat_label.setText(
+            f"<b>{total_groups}</b> Groups • "
+            f"<b>{total_selected}</b> Selected • "
+            f"<b>{format_bytes(total_reclaimable)}</b> to Reclaim"
+        )
+        self.delete_btn.setEnabled(total_selected > 0)
+        
+        # Update recovery bar width smoothly
+        if max_possible > 0:
+            percentage = min(total_reclaimable / max_possible, 1.0)
+            target_width = int(self.recovery_bar.width() * percentage)
+            target_width = max(target_width, 1)
+            
+            self.bar_anim = QPropertyAnimation(self.recovery_fill, b"minimumWidth")
+            self.bar_anim.setDuration(300)
+            self.bar_anim.setEndValue(target_width)
+            self.bar_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+            self.bar_anim.start()
+        else:
+            self.recovery_fill.setFixedWidth(0)
+
     def on_strategy_changed(self, text: str):
-        """Handle strategy change."""
         strategy_map = {
             "Keep Highest Resolution": "keep_highest_resolution",
             "Keep Oldest": "keep_oldest",
             "Keep Newest": "keep_newest",
             "Keep Shortest Path": "keep_shortest_path"
         }
-        
         self.strategy = strategy_map.get(text, "keep_highest_resolution")
-        
-        # Recreate group widgets with new strategy
-        # Remove old widgets
-        scroll_area = self.centralWidget().layout().itemAt(1).widget()
-        scroll_widget = scroll_area.widget()
-        layout = scroll_widget.layout()
-        
-        # Clear layout
-        for i in reversed(range(layout.count())):
-            item = layout.itemAt(i)
-            if item.widget():
-                item.widget().deleteLater()
-        
-        # Recreate widgets
-        self.create_group_widgets(layout)
-        layout.addStretch()
-    
-    def update_summary(self):
-        """Update the summary label."""
-        selected_files = []
-        total_size = 0
-        
-        for group_widget in self.group_widgets:
-            selected = group_widget.get_selected_files()
-            selected_files.extend(selected)
-            total_size += sum(f.size for f in selected)
-        
-        self.summary_label.setText(
-            f"<b>{len(selected_files)} files selected</b> - "
-            f"<b>{format_bytes(total_size)}</b> to free"
-        )
-    
-    def delete_selected(self):
-        """Delete selected files."""
-        # Update summary
+        self.refresh_results()
         self.update_summary()
-        
-        # Get all selected files
+
+    def clear_all_selection(self):
+        for g in self.group_widgets:
+            g.deselect_all()
+        self.update_summary()
+
+    def confirm_deletion(self):
         selected_files = []
-        for group_widget in self.group_widgets:
-            selected_files.extend(group_widget.get_selected_files())
+        for g in self.group_widgets:
+            selected_files.extend(g.get_selected_for_deletion())
         
-        if not selected_files:
-            QMessageBox.warning(
-                self,
-                "No Files Selected",
-                "Please select files to delete."
-            )
-            return
-        
-        # Show confirmation dialog
+        if not selected_files: return
+
         dialog = DeletionConfirmationDialog(selected_files, self)
         if dialog.exec() == dialog.DialogCode.Accepted:
             method, confirmed = dialog.get_result()
-            
-            if not confirmed:
-                return
-            
-            # Perform deletion
-            self.perform_deletion(selected_files, method)
-    
+            if confirmed:
+                self.perform_deletion(selected_files, method)
+
     def perform_deletion(self, files: List[FileInfo], method: DeletionMethod):
-        """Perform the actual deletion."""
         manager = DeletionManager()
-        
-        # Prepare file paths with sizes
         files_with_sizes = [(f.path, f.size) for f in files]
-        
-        # Delete files
         report = manager.delete_files_with_sizes(files_with_sizes, method)
         
-        # Show results
         if report.successful_deletions == report.total_files:
-            QMessageBox.information(
-                self,
-                "Deletion Successful",
-                f"Successfully deleted {report.successful_deletions} files.\n\n"
-                f"Space freed: {format_bytes(report.total_space_freed)}\n\n"
-                f"Deletion log saved to:\n{report.log_file_path}"
-            )
+            QMessageBox.information(self, "Success", f"Cleaned {report.successful_deletions} files.\n{format_bytes(report.total_space_freed)} freed.")
             self.close()
         else:
-            QMessageBox.warning(
-                self,
-                "Deletion Completed with Errors",
-                f"Deleted: {report.successful_deletions}/{report.total_files} files\n"
-                f"Failed: {report.failed_deletions} files\n\n"
-                f"Space freed: {format_bytes(report.total_space_freed)}\n\n"
-                f"Check log for details:\n{report.log_file_path}"
-            )
-    
+            QMessageBox.warning(self, "Partial Success", f"Errors occurred. Check logs:\n{report.log_file_path}")
+
     def export_results(self):
-        """Export results to JSON file."""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Results",
-            "duplicate_results.json",
-            "JSON Files (*.json)"
-        )
-        
-        if not file_path:
-            return
-        
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Results", "duplicate_results.json", "JSON (*.json)")
+        if not file_path: return
         try:
-            data = {
-                'total_groups': len(self.duplicate_groups),
-                'groups': [group.to_dict() for group in self.duplicate_groups]
-            }
-            
+            data = {'groups': [g.group.to_dict() for g in self.group_widgets]}
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
-            QMessageBox.information(
-                self,
-                "Export Successful",
-                f"Results exported to:\n{file_path}"
-            )
-        
+                json.dump(data, f, indent=2)
+            QMessageBox.information(self, "Exported", f"Results saved to {file_path}")
         except Exception as e:
-            logger.error(f"Export failed: {e}")
-            QMessageBox.critical(
-                self,
-                "Export Failed",
-                f"Failed to export results:\n{str(e)}"
-            )
+            QMessageBox.critical(self, "Error", f"Export failed: {e}")

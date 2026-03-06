@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
 from utils import get_image_resolution, is_system_folder, get_file_times
-from logger import get_logger
+from logger import get_logger, performance_monitor
 
 logger = get_logger()
 
@@ -65,6 +65,7 @@ class FileScanner:
             logger.warning(f"Unable to load config from {config_path}: {e}. Using defaults.")
             return {}
     
+    @performance_monitor
     def scan_directories(self, 
                         root_paths: List[str], 
                         progress_callback: Optional[Callable[[int, str], None]] = None) -> List[FileInfo]:
@@ -165,6 +166,7 @@ class FileScanner:
         
         # Check if extension is supported
         if extension not in self.supported_extensions:
+            logger.debug(f"Skip - Unsupported extension: {file_path}")
             return None
         
         # Get file size
@@ -177,6 +179,7 @@ class FileScanner:
         # Check minimum file size
         min_size = self.scan_options.get('min_file_size_bytes', 0)
         if size < min_size:
+            logger.debug(f"Skip - Below min size ({size} < {min_size}): {file_path}")
             return None
         
         # Get image resolution

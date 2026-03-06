@@ -5,6 +5,8 @@ Provides both file and console logging with rotation support.
 
 import logging
 import os
+import time
+import functools
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
@@ -59,6 +61,20 @@ def setup_logger(name: str = "DuplicateFinder", log_dir: str = "logs") -> loggin
     logger.addHandler(console_handler)
     
     return logger
+
+
+def performance_monitor(func):
+    """Decorator to log the execution time of a function."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        logger = get_logger()
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        logger.info(f"PERF - {func.__name__} executed in {duration:.4f} seconds")
+        return result
+    return wrapper
 
 
 def get_logger(name: str = "DuplicateFinder") -> logging.Logger:

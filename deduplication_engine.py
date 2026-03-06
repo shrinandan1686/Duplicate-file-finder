@@ -11,7 +11,7 @@ import json
 
 from file_scanner import FileInfo
 from utils import compute_file_hash, format_bytes
-from logger import get_logger
+from logger import get_logger, performance_monitor
 
 logger = get_logger()
 
@@ -117,6 +117,7 @@ class DeduplicationEngine:
             logger.warning(f"Unable to load config: {e}")
             return {}
     
+    @performance_monitor
     def find_duplicates(self, 
                        files: List[FileInfo],
                        use_perceptual: bool = False,
@@ -172,6 +173,7 @@ class DeduplicationEngine:
         # Filter out singleton groups (no possible duplicates)
         return {k: v for k, v in groups.items() if len(v) > 1}
     
+    @performance_monitor
     def _find_exact_duplicates(self, 
                                size_groups: Dict[tuple, List[FileInfo]],
                                progress_callback: Optional[Callable[[int, int], None]]) -> List[DuplicateGroup]:
@@ -228,6 +230,7 @@ class DeduplicationEngine:
         
         return duplicate_groups
     
+    @performance_monitor
     def _find_similar_images(self,
                             all_files: List[FileInfo],
                             exact_duplicates: List[DuplicateGroup],

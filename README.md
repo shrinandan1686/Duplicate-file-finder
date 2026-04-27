@@ -11,23 +11,23 @@
 
 **A safe, user-friendly Windows desktop application for detecting and managing duplicate image files with intelligent suggestions and multiple safety mechanisms.**
 
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage-guide) • [Security](#-safety-features) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Usage](#-usage-guide) • [Safety](#-safety-features) • [Troubleshooting](#-troubleshooting)
 
 </div>
 
 ---
 
-## ✨ Features
+## Features
 
 - **Multi-Stage Deduplication**
   - Fast pre-filtering by file size and extension
   - SHA-256 hash-based exact duplicate detection
-  - Optional perceptual hashing for finding similar images (resized, recompressed)
+  - Optional perceptual hashing for visually similar images (resized, recompressed)
 
 - **Safe Deletion**
   - Move to Recycle Bin (default, reversible)
   - Permanent deletion with multiple confirmation layers
-  - Comprehensive logging of all deletion operations
+  - Comprehensive JSON logs of all deletion operations
   - Dry-run preview mode
 
 - **Intelligent Suggestions**
@@ -37,148 +37,163 @@
   - Configurable strategies
 
 - **User-Friendly Interface**
+  - Dark-themed modern UI
   - Progress tracking with real-time updates
   - Thumbnail previews for all images
-  - Easy selection and batch operations
   - Export results to JSON
+  - Load previous scan results
 
-## 📋 Requirements
+---
 
-- Windows 10 or 11
-- Python 3.10 or higher
-- ~100MB disk space for application and thumbnails
+## Quick Start
 
-## 🚀 Installation
+### Prerequisites
 
-### Step 1: Install Python
+- **Windows 10 or 11**
+- **Python 3.10 or higher** — download from [python.org](https://www.python.org/downloads/)
+  - During installation, check **"Add Python to PATH"**
 
-Download and install Python 3.10+ from [python.org](https://www.python.org/downloads/)
+### 1. Clone the repository
 
-Make sure to check "Add Python to PATH" during installation.
+```powershell
+git clone https://github.com/shrinandan1686/Duplicate-file-finder.git
+cd "Duplicate-file-finder"
+```
 
-### Step 2: Install Dependencies
+### 2. Create a virtual environment
 
-Open PowerShell or Command Prompt in the application directory and run:
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+### 3. Install dependencies
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-This will install:
-- `PyQt6` - UI framework
-- `Pillow` - Image processing
-- `imagehash` - Perceptual hashing (optional)
-- `send2trash` - Recycle bin support
+This installs:
+| Package | Purpose |
+|---------|---------|
+| `PyQt6 >= 6.6.0` | Desktop GUI framework |
+| `Pillow >= 10.0.0` | Image processing and thumbnails |
+| `imagehash >= 4.3.1` | Perceptual hashing for similar images |
+| `send2trash >= 1.8.2` | Safe Recycle Bin deletion |
 
-### Step 3: Run the Application
+### 4. Run the application
 
 ```powershell
 python main.py
 ```
 
-## 📖 Usage Guide
+---
+
+## Project Structure
+
+```
+Duplicate-file-finder/
+│
+├── main.py                    # Application entry point
+├── config.json                # Runtime configuration
+├── requirements.txt           # Python dependencies
+│
+├── Core Modules
+│   ├── file_scanner.py        # Recursive directory scanning
+│   ├── deduplication_engine.py# Duplicate detection (hash + perceptual)
+│   ├── deletion_manager.py    # Safe file deletion with logging
+│   └── suggestion_engine.py   # Smart keeper suggestions
+│
+├── Utilities
+│   ├── utils.py               # File helpers, hashing, thumbnails
+│   └── logger.py              # Rotating file + console logging
+│
+├── UI Components
+│   ├── ui_main_window.py      # Main application window
+│   ├── ui_results_view.py     # Duplicate results display
+│   ├── ui_dialogs.py          # Confirmation dialogs
+│   └── ui_styles.py           # Dark theme stylesheet
+│
+├── Tests
+│   └── test_core.py           # Core backend tests (no UI required)
+│
+└── Generated at runtime (gitignored)
+    ├── logs/                  # App logs (app_YYYYMMDD.log)
+    ├── deletion_logs/         # Deletion records (deletion_*.json)
+    └── thumbnails/            # Cached image thumbnails
+```
+
+---
+
+## Usage Guide
 
 ### 1. Select Folders
 
-Click **Add Folder** to select one or more directories to scan. The application will recursively scan all subdirectories.
+Click **Add Folder** to choose directories to scan. The app recursively scans all subdirectories.
 
 ### 2. Configure Options
 
-- **Include hidden/system folders**: By default, system folders are excluded for safety
-- **Enable perceptual hashing**: Find visually similar images (slower but more thorough)
-- **Similarity threshold**: Adjust how strict the similarity matching is (1-10, lower = stricter)
+| Option | Default | Description |
+|--------|---------|-------------|
+| Include hidden/system folders | Off | System folders excluded for safety |
+| Enable perceptual hashing | Off | Finds visually similar images (slower) |
+| Similarity threshold | 5 | 1–10, lower = stricter matching |
 
 ### 3. Start Scan
 
-Click **Start Scan** to begin. Progress will be shown in real-time:
+Click **Start Scan**. Real-time progress shows:
 - Files scanned counter
 - Current operation status
 - Progress bar
 
 ### 4. Review Results
 
-After scanning, you'll see:
-- **Duplicate Groups**: Each group shows files with identical or similar content
-- **Thumbnails**: Visual preview of each file
-- **Metadata**: Path, size, resolution, creation date
-- **⭐ Suggested file**: Automatically recommended file to keep
+Each duplicate group shows:
+- **Thumbnails** — visual preview of each file
+- **Metadata** — path, size, resolution, creation date
+- **Suggested file** — automatically recommended keeper
 
 ### 5. Select Files to Delete
 
-For each group:
-- **Select All Except Suggested**: Quick select all duplicates except the recommended keeper
-- **Manual selection**: Check/uncheck individual files
-- **Change strategy**: Try different suggestion strategies (highest resolution, oldest, etc.)
+- **Select All Except Suggested** — quick-select all duplicates
+- **Manual selection** — check/uncheck individual files
+- **Change strategy** — switch between suggestion strategies
 
 ### 6. Delete Files
 
 Click **Delete Selected Files** and choose:
-- **Move to Recycle Bin** (Recommended): Files can be restored
-- **Permanent Delete**: Requires typing "DELETE" for confirmation
+- **Move to Recycle Bin** *(Recommended)* — reversible
+- **Permanent Delete** — requires typing `DELETE` to confirm, then a final prompt
 
-A deletion log will be saved to `deletion_logs/` with complete details.
+A deletion log is saved to `deletion_logs/` with full details.
 
-## 🛡️ Safety Features
+### 7. Load Previous Results
 
-### Multiple Confirmation Layers
-1. Explicit file selection (no auto-deletion)
-2. Deletion confirmation dialog
-3. Type "DELETE" for permanent deletion
-4. Final "Are you sure?" prompt
+Use **Load Previous Results** to reload a saved `duplicate_results.json` scan without rescanning.
 
-### Comprehensive Logging
-All operations are logged to:
-- `logs/app_YYYYMMDD.log` - Application log
-- `deletion_logs/deletion_YYYYMMDD_HHMMSS.json` - Deletion records
+---
 
-### Error Handling
-- Permission errors
-- Locked files
-- Corrupt images
-All errors are logged and displayed with helpful messages.
+## Configuration
 
-## 📂 File Structure
-
-```
-Dublicate Finder/
-├── main.py                    # Application entry point
-├── config.json                # Configuration file
-├── requirements.txt           # Python dependencies
-├── README.md                  # This file
-│
-├── Core Modules:
-│   ├── file_scanner.py        # Directory scanning
-│   ├── deduplication_engine.py # Duplicate detection
-│   ├── deletion_manager.py    # Safe file deletion
-│   └── suggestion_engine.py   # File keeper suggestions
-│
-├── Utilities:
-│   ├── utils.py               # Helper functions
-│   └── logger.py              # Logging configuration
-│
-├── UI Components:
-│   ├── ui_main_window.py      # Main window
-│   ├── ui_results_view.py     # Results display
-│   └── ui_dialogs.py          # Confirmation dialogs
-│
-└── Generated Directories:
-    ├── logs/                  # Application logs
-    ├── deletion_logs/         # Deletion records
-    └── thumbnails/            # Cached thumbnails
-```
-
-## ⚙️ Configuration
-
-Edit `config.json` to customize:
+Edit `config.json` to customize behavior:
 
 ```json
 {
-  "supported_extensions": [".jpg", ".jpeg", ".png", ".heic", ".webp"],
+  "supported_extensions": [".jpg", ".jpeg", ".png", ".heic", ".webp", ".gif", ".bmp"],
   "scan_options": {
     "include_hidden_folders": false,
+    "include_system_folders": false,
     "min_file_size_bytes": 1024
   },
   "suggestion_strategy": "keep_highest_resolution",
+  "ui_preferences": {
+    "thumbnail_size": 150,
+    "theme": "light"
+  },
+  "performance": {
+    "max_worker_threads": 4,
+    "hash_chunk_size_kb": 64
+  },
   "perceptual_hash": {
     "enabled": false,
     "similarity_threshold": 5
@@ -186,85 +201,117 @@ Edit `config.json` to customize:
 }
 ```
 
-## 🔍 How It Works
+---
 
-### Stage 1: Fast Pre-filter
-Groups files by (size, extension). Files with different sizes can't be duplicates.
+## How It Works
 
-### Stage 2: Hash-based Detection
-Computes SHA-256 hash for files in same size groups. Identical hashes = exact duplicates.
+### Stage 1 — Fast Pre-filter
+Groups files by `(size, extension)`. Files with different sizes cannot be duplicates — eliminates most files instantly.
 
-### Stage 3: Perceptual Hashing (Optional)
-Uses image hashing algorithms (aHash) to detect visually similar images even if:
+### Stage 2 — SHA-256 Hash Detection
+Computes SHA-256 hash for each file in same-size groups using chunked reading. Identical hashes = exact duplicates.
+
+### Stage 3 — Perceptual Hashing *(optional)*
+Uses `imagehash` (aHash algorithm) to detect visually similar images even if:
 - Resized to different dimensions
-- Recompressed with different quality
+- Recompressed at different quality
 - Minor edits applied
-
-## 📊 Performance
-
-- **10,000 files**: ~30-60 seconds (hash-based only)
-- **10,000 files**: ~2-5 minutes (with perceptual hashing)
-- **Memory usage**: ~200-500 MB depending on image sizes
-
-Tips for faster scanning:
-- Disable perceptual hashing if not needed
-- Reduce `max_worker_threads` if CPU usage is too high
-- Increase `min_file_size_bytes` to skip tiny files
-
-## ⚠️ Important Notes
-
-### What Gets Scanned
-- Only image files with supported extensions
-- Recursively scans subdirectories
-- Skips system/hidden folders by default
-
-### What Doesn't Get Deleted
-- Files not explicitly selected
-- Files that are locked by other programs
-- Files with permission errors
-
-### Recycle Bin Limitations
-- Very large files (>4GB) may not go to Recycle Bin on some systems
-- Network drives may not support Recycle Bin
-
-## 🐛 Troubleshooting
-
-### Application won't start
-- Check Python version: `python --version` (should be 3.10+)
-- Reinstall dependencies: `pip install -r requirements.txt --force-reinstall`
-
-### "send2trash library not available"
-- Install manually: `pip install send2trash`
-
-### Thumbnails not showing
-- Ensure Pillow is installed: `pip install Pillow`
-- Check `thumbnails/` directory has write permissions
-
-### Scan is very slow
-- Disable perceptual hashing
-- Reduce number of folders being scanned
-- Check antivirus isn't scanning files
-
-## 🚀 Future Enhancements
-
-- [ ] Video file support
-- [ ] Cloud storage scanning (Google Photos, OneDrive)
-- [ ] Scheduled automatic scanning
-- [ ] Auto-rules based on past decisions
-- [ ] GPU-accelerated perceptual hashing
-- [ ] Integration with file managers
-
-## 📝 License
-
-This software is provided as-is for personal use.
-
-## 🤝 Support
-
-For issues or questions:
-1. Check the logs in `logs/` directory
-2. Review deletion logs in `deletion_logs/` directory
-3. Ensure all dependencies are properly installed
 
 ---
 
-**⚠️ Always backup important files before using any duplicate file finder!**
+## Running Tests
+
+Tests cover core backend logic without requiring a display:
+
+```powershell
+python test_core.py
+```
+
+This validates:
+- File Scanner — directory traversal and metadata extraction
+- Deduplication Engine — hash-based grouping
+- Suggestion Engine — keeper selection strategies
+- Deletion Manager — dry-run and preview modes
+
+---
+
+## Safety Features
+
+### Multiple Confirmation Layers
+1. Explicit file selection required — no auto-deletion
+2. Deletion method selection dialog
+3. Type `DELETE` to confirm permanent deletion
+4. Final "Are you sure?" prompt
+
+### Comprehensive Logging
+
+| Log Type | Location | Format |
+|----------|----------|--------|
+| Application log | `logs/app_YYYYMMDD.log` | Rotating (10 MB max, 5 backups) |
+| Deletion records | `deletion_logs/deletion_YYYYMMDD_HHMMSS.json` | JSON with full details |
+
+### Error Handling
+- Permission errors — logged, file skipped
+- Locked files — detected before deletion attempt
+- Corrupt images — caught, reported, skipped
+
+---
+
+## Performance
+
+| Workload | Time |
+|----------|------|
+| 10,000 files (hash only) | ~30–60 seconds |
+| 10,000 files (with perceptual) | ~2–5 minutes |
+| Memory usage | ~200–500 MB |
+
+**Tips for faster scans:**
+- Disable perceptual hashing unless needed
+- Lower `max_worker_threads` if CPU usage is too high
+- Raise `min_file_size_bytes` to skip small files
+
+---
+
+## Troubleshooting
+
+**Application won't start**
+```powershell
+python --version          # Must be 3.10+
+pip install -r requirements.txt --force-reinstall
+```
+
+**Virtual environment not activating**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.venv\Scripts\activate
+```
+
+**"send2trash library not available"**
+```powershell
+pip install send2trash
+```
+
+**Thumbnails not showing**
+```powershell
+pip install Pillow
+# Also verify thumbnails/ directory has write permissions
+```
+
+**Scan is very slow**
+- Disable perceptual hashing in `config.json`
+- Reduce the number of folders scanned
+- Check that antivirus isn't intercepting file reads
+
+---
+
+## Important Notes
+
+- Only image files with supported extensions are scanned
+- System and hidden folders are excluded by default
+- Files are never auto-deleted — explicit selection is always required
+- Very large files (>4 GB) may not go to Recycle Bin on some configurations
+- Network drives may not support Recycle Bin
+
+---
+
+**Always back up important files before using any duplicate finder.**

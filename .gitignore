@@ -65,3 +65,5 @@ htmlcov/
 
 # Distribution / packaging
 *.whl
+graphify-out/
+.claude/settings.local.json
